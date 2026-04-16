@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VaseCraft — 3D Редактор Ваз</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg-dark: #0a0e1a; --bg-panel: #111827; --bg-card: #1a2236;
+    --bg-hover: #243049; --border: #2a3a5c; --accent: #6366f1;
+    --accent-light: #818cf8; --accent-glow: rgba(99,102,241,0.3);
+    --text: #e2e8f0; --text-dim: #94a3b8; --text-muted: #64748b;
+    --success: #22c55e;
+  }
+  body { font-family: 'Inter', sans-serif; background: var(--bg-dark); color: var(--text); overflow: hidden; height: 100vh; width: 100vw; }
+  #app { display: flex; flex-direction: column; height: 100vh; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; height: 56px; padding: 0 20px; background: var(--bg-panel); border-bottom: 1px solid var(--border); z-index: 100; flex-shrink: 0; }
+  .topbar-logo { display: flex; align-items: center; gap: 12px; }
+  .logo-svg { width: 36px; height: 36px; }
+  .topbar-logo h1 { font-size: 18px; font-weight: 700; background: linear-gradient(135deg, #818cf8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .topbar-logo span { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+  .topbar-actions { display: flex; align-items: center; gap: 8px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif; white-space: nowrap; }
+  .btn:hover { background: var(--bg-hover); border-color: var(--accent); }
+  .btn-primary { background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; color: white; }
+  .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 15px var(--accent-glow); }
+  .btn-icon { padding: 8px; width: 36px; height: 36px; justify-content: center; }
+  .btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .main-layout { display: flex; flex: 1; overflow: hidden; }
+  .sidebar-left { width: 260px; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+  .sidebar-section { padding: 16px; border-bottom: 1px solid var(--border); }
+  .section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); margin-bottom: 12px; }
+  .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .preset-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-card); cursor: pointer; transition: all 0.2s; }
+  .preset-card:hover { border-color: var(--accent); background: var(--bg-hover); transform: translateY(-2px); }
+  .preset-card.active { border-color: var(--accent); background: rgba(99,102,241,0.1); box-shadow: 0 0 20px var(--accent-glow); }
+  .preset-icon { width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.15)); border-radius: 12px; }
+  .preset-icon svg { width: 32px; height: 32px; fill: none; stroke: var(--accent-light); stroke-width: 1.5; stroke-linecap: round; }
+  .preset-name { font-size: 11px; font-weight: 600; color: var(--text); text-align: center; }
+  .viewport-container { flex: 1; position: relative; background: radial-gradient(ellipse at center, #1a1a2e 0%, #0a0e1a 100%); }
+  #viewport { width: 100%; height: 100%; display: block; }
+  .viewport-info { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 16px; padding: 8px 16px; background: rgba(17,24,39,0.85); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: 20px; font-size: 11px; color: var(--text-muted); }
+  .viewport-info span { display: flex; align-items: center; gap: 4px; }
+  .viewport-info .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+  .viewport-controls { position: absolute; top: 16px; right: 16px; display: flex; flex-direction: column; gap: 4px; }
+  .viewport-controls .btn { width: 40px; height: 40px; padding: 0; justify-content: center; background: rgba(17,24,39,0.85); backdrop-filter: blur(10px); }
+  .viewport-controls .btn svg { width: 18px; height: 18px; }
+  .view-label { position: absolute; top: 16px; left: 16px; padding: 6px 12px; background: rgba(17,24,39,0.85); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; font-weight: 600; color: var(--text-dim); }
+  .sidebar-right { width: 300px; background: var(--bg-panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+  .sidebar-right::-webkit-scrollbar, .sidebar-left::-webkit-scrollbar { width: 4px; }
+  .sidebar-right::-webkit-scrollbar-track, .sidebar-left::-webkit-scrollbar-track { background: transparent; }
+  .sidebar-right::-webkit-scrollbar-thumb, .sidebar-left::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .tab { flex: 1; padding: 12px; text-align: center; font-size: 11px; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.5px; }
+  .tab:hover { color: var(--text-dim); }
+  .tab.active { color: var(--accent-light); border-bottom-color: var(--accent); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .control-group { padding: 16px; border-bottom: 1px solid var(--border); }
+  .control-group-title { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .control-group-title svg { width: 14px; height: 14px; stroke: var(--accent-light); fill: none; stroke-width: 2; }
+  .control-row { margin-bottom: 12px; }
+  .control-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .control-label label { font-size: 12px; color: var(--text-dim); font-weight: 500; }
+  .control-label .value { font-size: 11px; color: var(--accent-light); font-weight: 600; font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; }
+  input[type="range"] { -webkit-appearance: none; width: 100%; height: 4px; border-radius: 2px; background: var(--bg-dark); outline: none; cursor: pointer; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #8b5cf6); border: 2px solid var(--bg-panel); box-shadow: 0 2px 6px rgba(99,102,241,0.4); cursor: pointer; transition: transform 0.15s; }
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+  input[type="color"] { -webkit-appearance: none; width: 36px; height: 36px; border: 2px solid var(--border); border-radius: 8px; cursor: pointer; background: none; padding: 2px; }
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  input[type="color"]::-webkit-color-swatch { border: none; border-radius: 4px; }
+  .color-row { display: flex; gap: 8px; align-items: center; }
+  .color-presets { display: flex; gap: 6px; flex: 1; }
+  .color-swatch { width: 28px; height: 28px; border-radius: 6px; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; }
+  .color-swatch:hover { transform: scale(1.15); border-color: white; }
+  .color-swatch.active { border-color: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
+  .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
+  .toggle-row label { font-size: 12px; color: var(--text-dim); }
+  .toggle { position: relative; width: 40px; height: 22px; cursor: pointer; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; inset: 0; background: var(--bg-dark); border-radius: 11px; border: 1px solid var(--border); transition: all 0.3s; }
+  .toggle-slider::before { content: ''; position: absolute; width: 16px; height: 16px; left: 2px; top: 2px; background: var(--text-muted); border-radius: 50%; transition: all 0.3s; }
+  .toggle input:checked + .toggle-slider { background: var(--accent); border-color: var(--accent); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(18px); background: white; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 1000; display: none; align-items: center; justify-content: center; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 16px; padding: 24px; width: 400px; max-width: 90vw; }
+  .modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .modal p { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .format-options { display: flex; gap: 8px; margin-bottom: 16px; }
+  .format-option { flex: 1; padding: 12px; border: 1px solid var(--border); border-radius: 10px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--bg-card); }
+  .format-option:hover { border-color: var(--accent); }
+  .format-option.active { border-color: var(--accent); background: rgba(99,102,241,0.1); }
+  .format-option .fmt { font-size: 16px; font-weight: 700; color: var(--accent-light); }
+  .format-option .fmt-desc { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+  .notification { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; background: var(--bg-card); border: 1px solid var(--success); border-radius: 10px; font-size: 13px; color: var(--success); z-index: 2000; display: none; align-items: center; gap: 8px; }
+  .notification.show { display: flex; }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  .notification.show { animation: slideUp 0.3s ease; }
+  .profile-canvas-wrap { position: relative; width: 100%; height: 200px; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .profile-canvas-wrap canvas { width: 100%; height: 100%; display: block; }
+  .stats-grid { display: flex; flex-direction: column; gap: 8px; }
+  .stat-row { display: flex; justify-content: space-between; font-size: 12px; }
+  .stat-label { color: var(--text-muted); }
+  .stat-value { color: var(--text-dim); font-weight: 600; }
+  @media (max-width: 1100px) { .sidebar-left { width: 220px; } .sidebar-right { width: 260px; } }
+  @media (max-width: 900px) { .sidebar-left { display: none; } .sidebar-right { width: 240px; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-logo">
+      <svg class="logo-svg" viewBox="0 0 36 36">
+        <defs><linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient></defs>
+        <path d="M18 4c-4 0-6 6-6 12s2 14 6 14 6-8 6-14-2-12-6-12z" fill="url(#logoGrad)" opacity="0.2" stroke="url(#logoGrad)" stroke-width="1.5"/>
+        <ellipse cx="18" cy="4" rx="4" ry="1.5" fill="none" stroke="url(#logoGrad)" stroke-width="1.5"/>
+        <ellipse cx="18" cy="30" rx="3" ry="1" fill="none" stroke="url(#logoGrad)" stroke-width="1.5"/>
+      </svg>
+      <div><h1>VaseCraft</h1><span>3D Редактор Ваз</span></div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-icon" onclick="resetView()" title="Сбросить вид">
+        <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 7v5h5"/></svg>
+      </button>
+      <button class="btn btn-icon" onclick="toggleWireframe()" title="Каркас">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+      </button>
+      <button class="btn" onclick="screenshot()">
+        <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Скриншот
+      </button>
+      <button class="btn btn-primary" onclick="showExportModal()">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Экспорт модели
+      </button>
+    </div>
+  </div>
+  <div class="main-layout">
+    <div class="sidebar-left">
+      <div class="sidebar-section">
+        <div class="section-title">Пресеты</div>
+        <div class="preset-grid" id="presetGrid"></div>
+      </div>
+      <div class="sidebar-section">
+        <div class="section-title">Профиль формы</div>
+        <div class="profile-canvas-wrap">
+          <canvas id="profileCanvas" width="228" height="200"></canvas>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="section-title">Статистика</div>
+        <div class="stats-grid">
+          <div class="stat-row"><span class="stat-label">Вершины</span><span class="stat-value" id="statVertices">0</span></div>
+          <div class="stat-row"><span class="stat-label">Треугольники</span><span class="stat-value" id="statTriangles">0</span></div>
+          <div class="stat-row"><span class="stat-label">Высота</span><span class="stat-value" id="statHeight">0 см</span></div>
+          <div class="stat-row"><span class="stat-label">Макс. ширина</span><span class="stat-value" id="statWidth">0 см</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="viewport-container">
+      <canvas id="viewport"></canvas>
+      <div class="view-label" id="viewLabel">Перспектива</div>
+      <div class="viewport-controls">
+        <button class="btn btn-icon" onclick="setView('front')" title="Вид спереди">
+          <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+        </button>
+        <button class="btn btn-icon" onclick="setView('side')" title="Вид сбоку">
+          <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+        </button>
+        <button class="btn btn-icon" onclick="setView('top')" title="Вид сверху">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+      <div class="viewport-info">
+        <span><span class="dot"></span> Готово</span>
+        <span>ЛКМ: Вращение</span>
+        <span>ПКМ: Панорама</span>
+        <span>Колёсико: Масштаб</span>
+      </div>
+    </div>
+    <div class="sidebar-right">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('shape', this)">Форма</div>
+        <div class="tab" onclick="switchTab('material', this)">Материал</div>
+        <div class="tab" onclick="switchTab('render', this)">Рендер</div>
+      </div>
+      <div class="tab-content active" id="tab-shape">
+        <div class="control-group">
+          <div class="control-group-title">
+            <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            Размеры
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Высота</label><span class="value" id="valHeight">25</span></div>
+            <input type="range" id="height" min="5" max="60" value="25" step="0.5" oninput="updateVase()">
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Радиус основания</label><span class="value" id="valBaseRadius">4</span></div>
+            <input type="range" id="baseRadius" min="1" max="15" value="4" step="0.5" oninput="updateVase()">
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Радиус верха</label><span class="value" id="valTopRadius">3</span></div>
+            <input type="range" id="topRadius" min="0.5" max="15" value="3" step="0.5" oninput="updateVase()">
+          </div>
+        </div>
+        <div class="control-group">
+          <div class="control-group-title">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12s1.5-2 4-2 4 2 4 2-1.5 2-4 2-4-2-4-2z"/></svg>
+            Форма тела
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Ширина живота</label><span class="value" id="valBellyWidth">7</span></div>
+            <input type="range" id="bellyWidth" min="1" max="20" value="7" step="0.5" oninput="updateVase()">
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Позиция живота</label><span class="value" id="valBellyPos">0.45</span></div>
+            <input type="range" id="bellyPos" min="0.1" max="0.9" value="0.45" step="0.05" oninput="updateVase()">
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Радиус горлышка</label><span class="value" id="valNeckRadius">2.5</span></div>
+            <input type="range" id="neckRadius" min="0.5" max="12" value="2.5" step="0.5" oninput="updateVase()">
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Позиция горлышка</label><span class="value" id="valNeckPos">0.75</span></div>
+            <input type="range" id="neckPos" min="0.4" max="0.95" value="0.75" step="0.05" oninput="updateVase()">
+          </div>
+        </div>
+        <div class="control-group">
+          <div class="control-group-title">
+            <svg viewBox="0 0 24 24"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M2 12h20"/></svg>
+            Стенки и детали
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Толщина стенок</label><span class="value" id="valWallThickness">0.4</span></div>
+            <input type="range" id="wallThickness" min="0.05" max="3" value="0.4" step="0.05" oninput="updateVase()">
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Сглаживание</label><span class="value" id="valSmoothness">32</span></div>
+            <input type="range" id="smoothness" min="8" max="128" value="32" step="1" oninput="updateVase()">
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Кривизна дна</label><span class="value" id="valBottomCurve">0.3</span></div>
+            <input type="range" id="bottomCurve" min="0" max="1" value="0.3" step="0.05" oninput="updateVase()">
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Расширение верха</label><span class="value" id="valTopFlare">0.2</span></div>
+            <input type="range" id="topFlare" min="-0.5" max="2" value="0.2" step="0.05" oninput="updateVase()">
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Ширина кромки</label><span class="value" id="valLipWidth">0.15</span></div>
+            <input type="range" id="lipWidth" min="0" max="1" value="0.15" step="0.05" oninput="updateVase()">
+          </div>
+          <div class="toggle-row"><label>Донное основание</label><label class="toggle"><input type="checkbox" id="hasBase" checked onchange="updateVase()"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><label>Открытое дно</label><label class="toggle"><input type="checkbox" id="openBottom" onchange="updateVase()"><span class="toggle-slider"></span></label></div>
+        </div>
+      </div>
+      <div class="tab-content" id="tab-material">
+        <div class="control-group">
+          <div class="control-group-title">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+            Цвет материала
+          </div>
+          <div class="color-row">
+            <input type="color" id="matColor" value="#e8e0d4" onchange="updateMaterial()">
+            <div class="color-presets">
+              <div class="color-swatch active" style="background:#e8e0d4" onclick="setColor(this,'#e8e0d4')"></div>
+              <div class="color-swatch" style="background:#f5f0e8" onclick="setColor(this,'#f5f0e8')"></div>
+              <div class="color-swatch" style="background:#c9b99a" onclick="setColor(this,'#c9b99a')"></div>
+              <div class="color-swatch" style="background:#8b4513" onclick="setColor(this,'#8b4513')"></div>
+              <div class="color-swatch" style="background:#2c3e50" onclick="setColor(this,'#2c3e50')"></div>
+              <div class="color-swatch" style="background:#e74c3c" onclick="setColor(this,'#e74c3c')"></div>
+            </div>
+          </div>
+        </div>
+        <div class="control-group">
+          <div class="control-group-title">
+            <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            Свойства поверхности
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Шероховатость</label><span class="value" id="valRoughness">0.3</span></div>
+            <input type="range" id="roughness" min="0" max="1" value="0.3" step="0.05" oninput="updateMaterial()">
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Металличность</label><span class="value" id="valMetalness">0.0</span></div>
+            <input type="range" id="metalness" min="0" max="1" value="0" step="0.05" oninput="updateMaterial()">
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Лаковое покрытие</label><span class="value" id="valClearcoat">0.5</span></div>
+            <input type="range" id="clearcoat" min="0" max="1" value="0.5" step="0.05" oninput="updateMaterial()">
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Шерох. покрытия</label><span class="value" id="valClearcoatRoughness">0.1</span></div>
+            <input type="range" id="clearcoatRoughness" min="0" max="1" value="0.1" step="0.05" oninput="updateMaterial()">
+          </div>
+        </div>
+        <div class="control-group">
+          <div class="control-group-title">
+            <svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M3 12h18"/></svg>
+            Пресеты материалов
+          </div>
+          <div class="preset-grid">
+            <div class="preset-card" onclick="applyMatPreset('ceramic')"><div class="preset-icon"><svg viewBox="0 0 32 32"><ellipse cx="16" cy="26" rx="8" ry="3"/><path d="M10 8c0 0-2 8-2 14s2 4 8 4 8 0 8-4-2-14-2-14"/></svg></div><div class="preset-name">Керамика</div></div>
+            <div class="preset-card" onclick="applyMatPreset('porcelain')"><div class="preset-icon"><svg viewBox="0 0 32 32"><ellipse cx="16" cy="26" rx="6" ry="2"/><path d="M12 6c0 0-4 6-4 16s4 4 8 4 8 0 8-4-4-16-4-16"/></svg></div><div class="preset-name">Фарфор</div></div>
+            <div class="preset-card" onclick="applyMatPreset('metal')"><div class="preset-icon"><svg viewBox="0 0 32 32"><rect x="10" y="6" width="12" height="20" rx="4"/><circle cx="16" cy="14" r="3"/></svg></div><div class="preset-name">Металл</div></div>
+            <div class="preset-card" onclick="applyMatPreset('glass')"><div class="preset-icon"><svg viewBox="0 0 32 32"><path d="M10 6l-2 20h16l-2-20z"/><ellipse cx="16" cy="6" rx="6" ry="2"/></svg></div><div class="preset-name">Стекло</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-content" id="tab-render">
+        <div class="control-group">
+          <div class="control-group-title">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            Освещение
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Фоновое</label><span class="value" id="valAmbient">0.4</span></div>
+            <input type="range" id="ambientIntensity" min="0" max="2" value="0.4" step="0.05" oninput="updateLighting()">
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Основной свет</label><span class="value" id="valKeyLight">1.0</span></div>
+            <input type="range" id="keyLight" min="0" max="3" value="1" step="0.1" oninput="updateLighting()">
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Заполняющий</label><span class="value" id="valFillLight">0.3</span></div>
+            <input type="range" id="fillLight" min="0" max="2" value="0.3" step="0.05" oninput="updateLighting()">
+          </div>
+          <div class="control-row">
+            <div class="control-label"><label>Контурный свет</label><span class="value" id="valRimLight">0.6</span></div>
+            <input type="range" id="rimLight" min="0" max="3" value="0.6" step="0.1" oninput="updateLighting()">
+          </div>
+        </div>
+        <div class="control-group">
+          <div class="control-group-title">
+            <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>
+            Отображение
+          </div>
+          <div class="toggle-row"><label>Показать сетку</label><label class="toggle"><input type="checkbox" id="showGrid" checked onchange="toggleGrid()"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><label>Показать оси</label><label class="toggle"><input type="checkbox" id="showAxes" checked onchange="toggleAxes()"><span class="toggle-slider"></span></label></div>
+          <div class="toggle-row"><label>Авто-вращение</label><label class="toggle"><input type="checkbox" id="autoRotate" onchange="toggleAutoRotate()"><span class="toggle-slider"></span></label></div>
+          <div class="control-row" style="margin-top:8px">
+            <div class="control-label"><label>Цвет фона</label></div>
+            <div class="color-row">
+              <input type="color" id="bgColor" value="#1a1a2e" onchange="updateBackground()">
+              <div class="color-presets">
+                <div class="color-swatch" style="background:#0a0e1a" onclick="setBgColor('#0a0e1a')"></div>
+                <div class="color-swatch" style="background:#1a1a2e" onclick="setBgColor('#1a1a2e')"></div>
+                <div class="color-swatch" style="background:#2d2d2d" onclick="setBgColor('#2d2d2d')"></div>
+                <div class="color-swatch" style="background:#f0f0f0" onclick="setBgColor('#f0f0f0')"></div>
+                <div class="color-swatch" style="background:#e8d5b7" onclick="setBgColor('#e8d5b7')"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="exportModal">
+  <div class="modal">
+    <h3>Экспорт модели</h3>
+    <p>Выберите формат и скачайте созданную модель вазы.</p>
+    <div class="format-options">
+      <div class="format-option active" onclick="selectFormat('obj', this)"><div class="fmt">OBJ</div><div class="fmt-desc">Wavefront OBJ</div></div>
+      <div class="format-option" onclick="selectFormat('stl', this)"><div class="fmt">STL</div><div class="fmt-desc">Стереолитография</div></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeExportModal()">Отмена</button>
+      <button class="btn btn-primary" onclick="exportModel()">Скачать</button>
+    </div>
+  </div>
+</div>
+<div class="notification" id="notification">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+  <span id="notifText">Модель экспортирована!</span>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const PRESETS = [
+  { name:'Классика', icon:'<svg viewBox="0 0 32 32"><path d="M16 4c-3 0-5 4-5 10s-3 12-5 14c0 0 4 2 10 2s10-2 10-2c-2-2-5-8-5-14s-2-10-5-10z"/></svg>', params:{height:25,baseRadius:4,topRadius:3.5,bellyWidth:8,bellyPos:0.4,neckRadius:3,neckPos:0.72,wallThickness:0.4,smoothness:32,bottomCurve:0.3,topFlare:0.3,lipWidth:0.2,hasBase:true,openBottom:false} },
+  { name:'Модерн', icon:'<svg viewBox="0 0 32 32"><path d="M12 4h8l-1 24H13z"/></svg>', params:{height:30,baseRadius:5,topRadius:5,bellyWidth:5,bellyPos:0.5,neckRadius:5,neckPos:0.5,wallThickness:0.3,smoothness:32,bottomCurve:0,topFlare:0,lipWidth:0.05,hasBase:true,openBottom:false} },
+  { name:'Амфора', icon:'<svg viewBox="0 0 32 32"><path d="M16 4c-5 0-7 4-7 8s4 12 1 16c0 0 2 2 6 2s6-2 6-2c-3-4 1-8 1-16s-2-8-7-8z"/><line x1="12" y1="28" x2="20" y2="28"/></svg>', params:{height:22,baseRadius:5,topRadius:4,bellyWidth:12,bellyPos:0.35,neckRadius:3.5,neckPos:0.65,wallThickness:0.5,smoothness:32,bottomCurve:0.2,topFlare:0.4,lipWidth:0.25,hasBase:true,openBottom:false} },
+  { name:'Бутылка', icon:'<svg viewBox="0 0 32 32"><path d="M16 2c-2 0-3 2-3 6v2c-4 1-6 4-6 12s3 6 9 6 9 0 9-6-2-11-6-12V8c0-4-1-6-3-6z"/></svg>', params:{height:35,baseRadius:5,topRadius:2,bellyWidth:7,bellyPos:0.3,neckRadius:2.5,neckPos:0.6,wallThickness:0.35,smoothness:32,bottomCurve:0.2,topFlare:0.1,lipWidth:0.1,hasBase:true,openBottom:false} },
+  { name:'Тюльпан', icon:'<svg viewBox="0 0 32 32"><path d="M16 28c-3 0-6-2-8-8s-2-14 2-18c0 0 2-2 6-2s6 2 6 2c4 4 4 12 2 18s-5 8-8 8z"/></svg>', params:{height:20,baseRadius:3,topRadius:7,bellyWidth:5,bellyPos:0.5,neckRadius:6,neckPos:0.7,wallThickness:0.3,smoothness:32,bottomCurve:0.4,topFlare:0.5,lipWidth:0.3,hasBase:true,openBottom:false} },
+  { name:'Песочные часы', icon:'<svg viewBox="0 0 32 32"><path d="M12 2c0 0-6 4-6 10s6 4 6 4 6 4 6 10-6 4-6 4 0-8 0-8H12z"/></svg>', params:{height:28,baseRadius:6,topRadius:6,bellyWidth:3,bellyPos:0.5,neckRadius:2.5,neckPos:0.5,wallThickness:0.4,smoothness:32,bottomCurve:0.1,topFlare:0,lipWidth:0.1,hasBase:true,openBottom:false} },
+  { name:'Горшок', icon:'<svg viewBox="0 0 32 32"><path d="M10 6c0 0-4 4-4 12s4 6 10 6 10 0 10-6-4-12-4-12z"/></svg>', params:{height:15,baseRadius:7,topRadius:6,bellyWidth:9,bellyPos:0.35,neckRadius:5.5,neckPos:0.7,wallThickness:0.6,smoothness:32,bottomCurve:0.2,topFlare:0.15,lipWidth:0.2,hasBase:true,openBottom:false} },
+  { name:'Элегант', icon:'<svg viewBox="0 0 32 32"><path d="M16 4c-2 0-4 2-4 8s-5 12-4 16c0 0 2 2 8 2s8-2 8-2c1-4-4-10-4-16s-2-8-4-8z"/></svg>', params:{height:30,baseRadius:3.5,topRadius:4,bellyWidth:9,bellyPos:0.42,neckRadius:3,neckPos:0.75,wallThickness:0.35,smoothness:48,bottomCurve:0.35,topFlare:0.35,lipWidth:0.2,hasBase:true,openBottom:false} }
+];
+
+let scene, camera, renderer, controls;
+let vaseGroup;
+let gridHelper, axesHelper;
+let keyLight, fillLight, rimLight, ambientLight;
+let currentFormat = 'obj';
+let wireframeMode = false;
+let activePreset = null;
+
+function init() {
+  const canvasEl = document.getElementById('viewport');
+  const container = canvasEl.parentElement;
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color('#1a1a2e');
+
+  camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+  camera.position.set(20, 18, 20);
+
+  renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, preserveDrawingBuffer: true });
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
+
+  controls = new OrbitControls(camera, canvasEl);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 5;
+  controls.maxDistance = 100;
+  controls.target.set(0, 10, 0);
+
+  ambientLight = new THREE.AmbientLight('#ffffff', 0.4);
+  scene.add(ambientLight);
+
+  keyLight = new THREE.DirectionalLight('#ffffff', 1.0);
+  keyLight.position.set(15, 30, 15);
+  keyLight.castShadow = true;
+  scene.add(keyLight);
+
+  fillLight = new THREE.DirectionalLight('#aabbff', 0.3);
+  fillLight.position.set(-15, 20, -10);
+  scene.add(fillLight);
+
+  rimLight = new THREE.DirectionalLight('#ffccaa', 0.6);
+  rimLight.position.set(-10, 10, -20);
+  scene.add(rimLight);
+
+  gridHelper = new THREE.GridHelper(40, 40, '#2a3a5c', '#1a2236');
+  gridHelper.position.y = 0;
+  scene.add(gridHelper);
+
+  axesHelper = new THREE.AxesHelper(15);
+  scene.add(axesHelper);
+
+  const groundGeo = new THREE.PlaneGeometry(100, 100);
+  const groundMat = new THREE.ShadowMaterial({ opacity: 0.15 });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = 0;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  vaseGroup = new THREE.Group();
+  vaseGroup.position.y = 0;
+  scene.add(vaseGroup);
+
+  buildPresetGrid();
+  updateVase();
+  animate();
+
+  window.addEventListener('resize', onResize);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+function onResize() {
+  const container = document.getElementById('viewport').parentElement;
+  camera.aspect = container.clientWidth / container.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(container.clientWidth, container.clientHeight);
+}
+
+function buildPresetGrid() {
+  const grid = document.getElementById('presetGrid');
+  grid.innerHTML = '';
+  PRESETS.forEach((preset, i) => {
+    const card = document.createElement('div');
+    card.className = 'preset-card' + (i === 0 ? ' active' : '');
+    card.innerHTML = `<div class="preset-icon">${preset.icon}</div><div class="preset-name">${preset.name}</div>`;
+    card.addEventListener('click', () => loadPreset(i));
+    grid.appendChild(card);
+  });
+}
+
+function loadPreset(index) {
+  const preset = PRESETS[index];
+  activePreset = index;
+  const p = preset.params;
+  document.getElementById('height').value = p.height;
+  document.getElementById('baseRadius').value = p.baseRadius;
+  document.getElementById('topRadius').value = p.topRadius;
+  document.getElementById('bellyWidth').value = p.bellyWidth;
+  document.getElementById('bellyPos').value = p.bellyPos;
+  document.getElementById('neckRadius').value = p.neckRadius;
+  document.getElementById('neckPos').value = p.neckPos;
+  document.getElementById('wallThickness').value = p.wallThickness;
+  document.getElementById('smoothness').value = p.smoothness;
+  document.getElementById('bottomCurve').value = p.bottomCurve;
+  document.getElementById('topFlare').value = p.topFlare;
+  document.getElementById('lipWidth').value = p.lipWidth;
+  document.getElementById('hasBase').checked = p.hasBase;
+  document.getElementById('openBottom').checked = p.openBottom;
+
+  document.querySelectorAll('.preset-card').forEach((c, idx) => c.classList.toggle('active', idx === index));
+  updateVase();
+}
+
+function getParams() {
+  return {
+    height: parseFloat(document.getElementById('height').value),
+    baseRadius: parseFloat(document.getElementById('baseRadius').value),
+    topRadius: parseFloat(document.getElementById('topRadius').value),
+    bellyWidth: parseFloat(document.getElementById('bellyWidth').value),
+    bellyPos: parseFloat(document.getElementById('bellyPos').value),
+    neckRadius: parseFloat(document.getElementById('neckRadius').value),
+    neckPos: parseFloat(document.getElementById('neckPos').value),
+    wallThickness: parseFloat(document.getElementById('wallThickness').value),
+    smoothness: parseInt(document.getElementById('smoothness').value),
+    bottomCurve: parseFloat(document.getElementById('bottomCurve').value),
+    topFlare: parseFloat(document.getElementById('topFlare').value),
+    lipWidth: parseFloat(document.getElementById('lipWidth').value),
+    hasBase: document.getElementById('hasBase').checked,
+    openBottom: document.getElementById('openBottom').checked
+  };
+}
+
+function generateProfile(params, inner) {
+  const H = params.height;
+  const thickness = inner ? params.wallThickness : 0;
+  const pts = [];
+
+  // Точка основания — на уровне y = 0
+  if (params.hasBase && !params.openBottom) {
+    pts.push(new THREE.Vector2(Math.max(0.02, params.baseRadius - thickness), 0));
+  }
+
+  // Скругление дна
+  const baseSeg = Math.max(3, Math.floor(params.smoothness * 0.08));
+  for (let i = 1; i <= baseSeg; i++) {
+    const t = i / baseSeg;
+    const curve = params.bottomCurve * Math.sin(t * Math.PI * 0.5);
+    const r = params.baseRadius + curve * 1.2 - thickness;
+    const y = t * H * 0.06;
+    pts.push(new THREE.Vector2(Math.max(0.02, r), y));
+  }
+
+  // Живот
+  const bellyY = params.bellyPos * H;
+  const bellySeg = Math.max(4, Math.floor(params.smoothness * 0.15));
+  for (let i = 1; i <= bellySeg; i++) {
+    const t = i / bellySeg;
+    const yStart = H * 0.06;
+    const y = yStart + t * (bellyY - yStart);
+    const blend = Math.sin(t * Math.PI);
+    const r = params.baseRadius + (params.bellyWidth - params.baseRadius) * blend - thickness;
+    pts.push(new THREE.Vector2(Math.max(0.02, r), y));
+  }
+
+  // Горлышко
+  const neckY = params.neckPos * H;
+  const neckSeg = Math.max(3, Math.floor(params.smoothness * 0.1));
+  for (let i = 1; i <= neckSeg; i++) {
+    const t = i / neckSeg;
+    const y = bellyY + t * (neckY - bellyY);
+    const blend = Math.pow(t, 0.6);
+    const r = params.bellyWidth + (params.neckRadius - params.bellyWidth) * blend - thickness;
+    pts.push(new THREE.Vector2(Math.max(0.02, r), y));
+  }
+
+  // Верх
+  const topSeg = Math.max(3, Math.floor(params.smoothness * 0.1));
+  for (let i = 1; i <= topSeg; i++) {
+    const t = i / topSeg;
+    const y = neckY + t * (H - neckY);
+    const blend = Math.pow(t, 0.7);
+    let r = params.neckRadius + (params.topRadius - params.neckRadius) * blend - thickness;
+    if (t > 0.7) {
+      const flareT = (t - 0.7) / 0.3;
+      r += params.topFlare * Math.sin(flareT * Math.PI * 0.5);
+    }
+    pts.push(new THREE.Vector2(Math.max(0.02, r), y));
+  }
+
+  // Кромка
+  if (params.lipWidth > 0.01) {
+    const topR = params.topRadius + params.lipWidth * 1.5;
+    pts.push(new THREE.Vector2(Math.max(0.02, topR - thickness), H));
+  }
+
+  return pts;
+}
+
+function updateVase() {
+  const params = getParams();
+  updateValueDisplays(params);
+
+  while (vaseGroup.children.length > 0) {
+    const child = vaseGroup.children[0];
+    if (child.geometry) child.geometry.dispose();
+    if (child.material) child.material.dispose();
+    vaseGroup.remove(child);
+  }
+
+  const outerPts = generateProfile(params, false);
+  const innerPts = generateProfile(params, true);
+
+  // Внешняя геометрия
+  const outerGeo = new THREE.LatheGeometry(outerPts, params.smoothness);
+  outerGeo.computeVertexNormals();
+
+  const outerMat = new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(document.getElementById('matColor').value),
+    roughness: parseFloat(document.getElementById('roughness').value),
+    metalness: parseFloat(document.getElementById('metalness').value),
+    clearcoat: parseFloat(document.getElementById('clearcoat').value),
+    clearcoatRoughness: parseFloat(document.getElementById('clearcoatRoughness').value),
+    side: THREE.DoubleSide,
+    wireframe: wireframeMode
+  });
+
+  const outerMesh = new THREE.Mesh(outerGeo, outerMat);
+  outerMesh.castShadow = true;
+  outerMesh.receiveShadow = true;
+  vaseGroup.add(outerMesh);
+
+  // Внутренняя поверхность
+  if (params.wallThickness > 0.05 && !params.openBottom) {
+    const innerGeo = new THREE.LatheGeometry(innerPts, params.smoothness);
+    innerGeo.computeVertexNormals();
+
+    const innerMat = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(document.getElementById('matColor').value).multiplyScalar(0.85),
+      roughness: parseFloat(document.getElementById('roughness').value) + 0.1,
+      metalness: parseFloat(document.getElementById('metalness').value),
+      side: THREE.BackSide,
+      wireframe: wireframeMode,
+      transparent: true,
+      opacity: 0.9
+    });
+
+    const innerMesh = new THREE.Mesh(innerGeo, innerMat);
+    vaseGroup.add(innerMesh);
+  }
+
+  // Дно-крышка
+  if (params.hasBase && !params.openBottom) {
+    const capGeo = new THREE.CircleGeometry(Math.max(0.02, params.baseRadius - params.wallThickness), params.smoothness);
+    const capMat = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(document.getElementById('matColor').value),
+      roughness: parseFloat(document.getElementById('roughness').value),
+      metalness: parseFloat(document.getElementById('metalness').value),
+      side: THREE.DoubleSide
+    });
+    const capMesh = new THREE.Mesh(capGeo, capMat);
+    capMesh.rotation.x = -Math.PI / 2;
+    capMesh.position.y = 0;
+    vaseGroup.add(capMesh);
+  }
+
+  // ВАЖНО: привязка основания к плоскости y = 0
+  // Нижняя точка всегда на y=0, не центрируем!
+  vaseGroup.position.y = 0;
+
+  updateStats(params);
+  drawProfile(params);
+
+  // Обновляем точку вращения камеры, чтобы центр вазы был в фокусе
+  controls.target.set(0, params.height * 0.4, 0);
+}
+
+function updateValueDisplays(p) {
+  document.getElementById('valHeight').textContent = p.height.toFixed(1);
+  document.getElementById('valBaseRadius').textContent = p.baseRadius.toFixed(1);
+  document.getElementById('valTopRadius').textContent = p.topRadius.toFixed(1);
+  document.getElementById('valBellyWidth').textContent = p.bellyWidth.toFixed(1);
+  document.getElementById('valBellyPos').textContent = p.bellyPos.toFixed(2);
+  document.getElementById('valNeckRadius').textContent = p.neckRadius.toFixed(1);
+  document.getElementById('valNeckPos').textContent = p.neckPos.toFixed(2);
+  document.getElementById('valWallThickness').textContent = p.wallThickness.toFixed(2);
+  document.getElementById('valSmoothness').textContent = p.smoothness;
+  document.getElementById('valBottomCurve').textContent = p.bottomCurve.toFixed(2);
+  document.getElementById('valTopFlare').textContent = p.topFlare.toFixed(2);
+  document.getElementById('valLipWidth').textContent = p.lipWidth.toFixed(2);
+}
+
+function updateStats(p) {
+  let verts = 0, tris = 0;
+  vaseGroup.children.forEach(child => {
+    if (child.geometry) {
+      const geo = child.geometry;
+      verts += geo.attributes.position.count;
+      tris += geo.index ? geo.index.count / 3 : geo.attributes.position.count / 3;
+    }
+  });
+  document.getElementById('statVertices').textContent = verts;
+  document.getElementById('statTriangles').textContent = Math.floor(tris);
+  document.getElementById('statHeight').textContent = p.height.toFixed(1) + ' см';
+  const maxR = Math.max(p.baseRadius, p.bellyWidth, p.topRadius, p.neckRadius);
+  document.getElementById('statWidth').textContent = (maxR * 2).toFixed(1) + ' см';
+}
+
+function drawProfile(params) {
+  const canvas = document.getElementById('profileCanvas');
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, w, h);
+
+  // Линии сетки
+  ctx.strokeStyle = '#1a2236';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 8; i++) {
+    const x = (i / 8) * w;
+    const y = (i / 8) * h;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+
+  const padding = 30;
+  const drawW = w - padding * 2;
+  const drawH = h - padding * 2;
+
+  const outerPts = generateProfile(params, false);
+  const innerPts = generateProfile(params, true);
+
+  const maxR = Math.max(params.baseRadius, params.bellyWidth, params.topRadius, params.neckRadius) + 2;
+
+  function mapPt(pt) {
+    return {
+      x: padding + (pt.x / maxR) * drawW * 0.45,
+      y: padding + drawH - (pt.y / params.height) * drawH
+    };
+  }
+
+  // Внешний профиль (левая сторона)
+  ctx.strokeStyle = '#6366f1';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  outerPts.forEach((pt, i) => {
+    const p = mapPt(pt);
+    if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+  });
+  ctx.stroke();
+
+  // Зеркало (правая сторона)
+  ctx.strokeStyle = '#818cf8';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  outerPts.forEach((pt, i) => {
+    const p = mapPt(pt);
+    const mx = w - p.x;
+    if (i === 0) ctx.moveTo(mx, p.y); else ctx.lineTo(mx, p.y);
+  });
+  ctx.stroke();
+
+  // Градиент заполнения
+  const grad = ctx.createLinearGradient(padding, 0, w - padding, 0);
+  grad.addColorStop(0, 'rgba(99,102,241,0.03)');
+  grad.addColorStop(0.5, 'rgba(99,102,241,0.12)');
+  grad.addColorStop(1, 'rgba(99,102,241,0.03)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  outerPts.forEach((pt, i) => {
+    const p = mapPt(pt);
+    if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+  });
+  for (let i = outerPts.length - 1; i >= 0; i--) {
+    const p = mapPt(outerPts[i]);
+    ctx.lineTo(w - p.x, p.y);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // Внутренний профиль
+  if (params.wallThickness > 0.05) {
+    ctx.strokeStyle = '#c084fc';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    innerPts.forEach((pt, i) => {
+      const p = mapPt(pt);
+      if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+    });
+    ctx.stroke();
+    ctx.beginPath();
+    innerPts.forEach((pt, i) => {
+      const p = mapPt(pt);
+      ctx.lineTo(w - p.x, p.y);
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Метка основания
+  const basePt = mapPt(outerPts[0]);
+  ctx.fillStyle = '#22c55e';
+  ctx.beginPath();
+  ctx.arc(basePt.x, basePt.y, 3, 0, Math.PI * 2);
+  ctx.fill();
+  const mx = w - basePt.x;
+  ctx.beginPath();
+  ctx.arc(mx, basePt.y, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Метки
+  ctx.fillStyle = '#64748b';
+  ctx.font = '9px Inter, sans-serif';
+  ctx.fillText('Профиль', w / 2 - 16, 12);
+  ctx.fillStyle = '#22c55e';
+  ctx.fillText('● основание', 4, h - 4);
+}
+
+function updateMaterial() {
+  const color = new THREE.Color(document.getElementById('matColor').value);
+  const roughness = parseFloat(document.getElementById('roughness').value);
+  const metalness = parseFloat(document.getElementById('metalness').value);
+  const clearcoat = parseFloat(document.getElementById('clearcoat').value);
+  const clearcoatRoughness = parseFloat(document.getElementById('clearcoatRoughness').value);
+
+  document.getElementById('valRoughness').textContent = roughness.toFixed(2);
+  document.getElementById('valMetalness').textContent = metalness.toFixed(2);
+  document.getElementById('valClearcoat').textContent = clearcoat.toFixed(2);
+  document.getElementById('valClearcoatRoughness').textContent = clearcoatRoughness.toFixed(2);
+
+  vaseGroup.children.forEach(child => {
+    if (child.material && !child.material.transparent) {
+      child.material.color.copy(color);
+      child.material.roughness = roughness;
+      child.material.metalness = metalness;
+      child.material.clearcoat = clearcoat;
+      child.material.clearcoatRoughness = clearcoatRoughness;
+    } else if (child.material) {
+      child.material.color.copy(color.clone().multiplyScalar(0.85));
+      child.material.roughness = roughness + 0.1;
+      child.material.metalness = metalness;
+    }
+  });
+}
+
+function setColor(el, hex) {
+  document.getElementById('matColor').value = hex;
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  updateMaterial();
+}
+
+function applyMatPreset(name) {
+  const presets = {
+    ceramic: { color:'#e8e0d4', roughness:0.3, metalness:0, clearcoat:0.5, clearcoatRoughness:0.1 },
+    porcelain: { color:'#f5f0e8', roughness:0.15, metalness:0, clearcoat:0.8, clearcoatRoughness:0.05 },
+    metal: { color:'#c0c0c0', roughness:0.2, metalness:0.9, clearcoat:0, clearcoatRoughness:0 },
+    glass: { color:'#d4e8f0', roughness:0.05, metalness:0, clearcoat:1, clearcoatRoughness:0 }
+  };
+  const p = presets[name];
+  document.getElementById('matColor').value = p.color;
+  document.getElementById('roughness').value = p.roughness;
+  document.getElementById('metalness').value = p.metalness;
+  document.getElementById('clearcoat').value = p.clearcoat;
+  document.getElementById('clearcoatRoughness').value = p.clearcoatRoughness;
+  updateMaterial();
+}
+
+function updateLighting() {
+  const a = parseFloat(document.getElementById('ambientIntensity').value);
+  const k = parseFloat(document.getElementById('keyLight').value);
+  const f = parseFloat(document.getElementById('fillLight').value);
+  const r = parseFloat(document.getElementById('rimLight').value);
+  document.getElementById('valAmbient').textContent = a.toFixed(2);
+  document.getElementById('valKeyLight').textContent = k.toFixed(1);
+  document.getElementById('valFillLight').textContent = f.toFixed(2);
+  document.getElementById('valRimLight').textContent = r.toFixed(1);
+  ambientLight.intensity = a;
+  keyLight.intensity = k;
+  fillLight.intensity = f;
+  rimLight.intensity = r;
+}
+
+function setView(view) {
+  const dist = 30;
+  const params = getParams();
+  const targetY = params.height * 0.4;
+  if (view === 'front') { camera.position.set(0, targetY + 5, dist); document.getElementById('viewLabel').textContent = 'Вид спереди'; }
+  else if (view === 'side') { camera.position.set(dist, targetY + 5, 0); document.getElementById('viewLabel').textContent = 'Вид сбоку'; }
+  else if (view === 'top') { camera.position.set(0, params.height + 15, 0.01); document.getElementById('viewLabel').textContent = 'Вид сверху'; }
+  controls.target.set(0, targetY, 0);
+  controls.update();
+}
+
+function resetView() {
+  const params = getParams();
+  const targetY = params.height * 0.4;
+  camera.position.set(20, targetY + 8, 20);
+  controls.target.set(0, targetY, 0);
+  document.getElementById('viewLabel').textContent = 'Перспектива';
+  controls.update();
+}
+
+function toggleWireframe() {
+  wireframeMode = !wireframeMode;
+  updateVase();
+}
+
+function toggleGrid() { gridHelper.visible = document.getElementById('showGrid').checked; }
+function toggleAxes() { axesHelper.visible = document.getElementById('showAxes').checked; }
+function toggleAutoRotate() { controls.autoRotate = document.getElementById('autoRotate').checked; controls.autoRotateSpeed = 2; }
+function updateBackground() { scene.background = new THREE.Color(document.getElementById('bgColor').value); }
+function setBgColor(c) { document.getElementById('bgColor').value = c; updateBackground(); }
+
+function switchTab(tabName, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + tabName).classList.add('active');
+}
+window.switchTab = switchTab;
+
+function screenshot() {
+  renderer.render(scene, camera);
+  const link = document.createElement('a');
+  link.download = 'vase-craft-screenshot.png';
+  link.href = renderer.domElement.toDataURL('image/png');
+  link.click();
+  showNotification('Скриншот сохранён!');
+}
+
+function showExportModal() { document.getElementById('exportModal').classList.add('show'); }
+function closeExportModal() { document.getElementById('exportModal').classList.remove('show'); }
+function selectFormat(fmt, el) { currentFormat = fmt; document.querySelectorAll('.format-option').forEach(o => o.classList.remove('active')); el.classList.add('active'); }
+
+function exportModel() {
+  if (currentFormat === 'obj') exportOBJ(); else exportSTL();
+  closeExportModal();
+  showNotification('Модель экспортирована в ' + currentFormat.toUpperCase() + '!');
+}
+
+function exportOBJ() {
+  let obj = '# Экспорт из VaseCraft\n';
+  let vertOffset = 0;
+
+  vaseGroup.children.forEach(child => {
+    if (!child.geometry) return;
+    const geo = child.geometry;
+    const pos = geo.attributes.position;
+    const norm = geo.attributes.normal;
+    const idx = geo.index;
+
+    obj += 'o Vase\n\n';
+    for (let i = 0; i < pos.count; i++) {
+      obj += `v ${pos.getX(i).toFixed(6)} ${pos.getY(i).toFixed(6)} ${pos.getZ(i).toFixed(6)}\n`;
+    }
+    obj += '\n';
+    for (let i = 0; i < norm.count; i++) {
+      obj += `vn ${norm.getX(i).toFixed(6)} ${norm.getY(i).toFixed(6)} ${norm.getZ(i).toFixed(6)}\n`;
+    }
+    obj += '\n';
+    if (idx) {
+      for (let i = 0; i < idx.count; i += 3) {
+        const a = idx.getX(i) + 1 + vertOffset;
+        const b = idx.getX(i+1) + 1 + vertOffset;
+        const c = idx.getX(i+2) + 1 + vertOffset;
+        obj += `f ${a}//${a} ${b}//${b} ${c}//${c}\n`;
+      }
+    } else {
+      for (let i = 0; i < pos.count; i += 3) {
+        const a = i + 1 + vertOffset;
+        const b = i + 2 + vertOffset;
+        const c = i + 3 + vertOffset;
+        obj += `f ${a}//${a} ${b}//${b} ${c}//${c}\n`;
+      }
+    }
+    obj += '\n';
+    vertOffset += pos.count;
+  });
+
+  downloadFile(obj, 'vaza-vasecraft.obj', 'application/octet-stream');
+}
+
+function exportSTL() {
+  let stl = 'solid vase\n';
+
+  vaseGroup.children.forEach(child => {
+    if (!child.geometry) return;
+    const geo = child.geometry;
+    const pos = geo.attributes.position;
+    const idx = geo.index;
+
+    function getVerts(i) {
+      const a = idx ? idx.getX(i) : i;
+      const b = idx ? idx.getX(i+1) : i+1;
+      const c = idx ? idx.getX(i+2) : i+2;
+      return [[pos.getX(a),pos.getY(a),pos.getZ(a)],[pos.getX(b),pos.getY(b),pos.getZ(b)],[pos.getX(c),pos.getY(c),pos.getZ(c)]];
+    }
+    function computeNormal(v0,v1,v2) {
+      const ax=v1[0]-v0[0],ay=v1[1]-v0[1],az=v1[2]-v0[2];
+      const bx=v2[0]-v0[0],by=v2[1]-v0[1],bz=v2[2]-v0[2];
+      const nx=ay*bz-az*by,ny=az*bx-ax*bz,nz=ax*by-ay*bx;
+      const len=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;
+      return [nx/len,ny/len,nz/len];
+    }
+
+    const triCount = idx ? idx.count/3 : Math.floor(pos.count/3);
+    for (let i = 0; i < triCount; i++) {
+      const verts = getVerts(i*3);
+      const n = computeNormal(verts[0],verts[1],verts[2]);
+      stl += `facet normal ${n[0].toFixed(6)} ${n[1].toFixed(6)} ${n[2].toFixed(6)}\n`;
+      stl += '  outer loop\n';
+      verts.forEach(v => stl += `    vertex ${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}\n`);
+      stl += '  endloop\nendfacet\n';
+    }
+  });
+
+  stl += 'endsolid vase\n';
+  downloadFile(stl, 'vaza-vasecraft.stl', 'application/octet-stream');
+}
+
+function downloadFile(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function showNotification(text) {
+  const notif = document.getElementById('notification');
+  document.getElementById('notifText').textContent = text;
+  notif.classList.add('show');
+  setTimeout(() => notif.classList.remove('show'), 3000);
+}
+
+window.loadPreset = loadPreset;
+window.updateVase = updateVase;
+window.updateMaterial = updateMaterial;
+window.updateLighting = updateLighting;
+window.setColor = setColor;
+window.applyMatPreset = applyMatPreset;
+window.setView = setView;
+window.resetView = resetView;
+window.toggleWireframe = toggleWireframe;
+window.toggleGrid = toggleGrid;
+window.toggleAxes = toggleAxes;
+window.toggleAutoRotate = toggleAutoRotate;
+window.updateBackground = updateBackground;
+window.setBgColor = setBgColor;
+window.screenshot = screenshot;
+window.showExportModal = showExportModal;
+window.closeExportModal = closeExportModal;
+window.selectFormat = selectFormat;
+window.exportModel = exportModel;
+
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
+
